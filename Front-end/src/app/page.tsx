@@ -11,16 +11,21 @@ import {
   BeakerIcon,
   StarIcon
 } from '@heroicons/react/24/outline';
+import { useEffect, useState } from 'react';
+import { getAllFeedbacks } from '@/lib/api/feedback';
+import { getAllUsers } from '@/lib/api/auth'; // Thêm import
+
+// Define TestimonialType if not imported from elsewhere
+type TestimonialType = {
+  name: string;
+  role: string;
+  rating: number;
+  content: string;
+  imageUrl: string;
+};
 
 export default function Home() {    const services = [
-    {
-      id: 'paternity',
-      title: 'Xét nghiệm Huyết thống',
-      description: 'Xác định mối quan hệ cha con, mẹ con thông qua xét nghiệm ADN với độ chính xác cao lên đến 99.9999%.',
-      imageUrl: '/images/cau-truc-xoan-kep-cua-DNA_.png',
-      href: '/services#paternity',
-      features: ['Kết quả chính xác', 'Bảo mật tuyệt đối', 'Tư vấn miễn phí'],
-    },
+    
     {
       id: 'legal',
       title: 'Xét nghiệm ADN Hành chính',
@@ -59,28 +64,40 @@ export default function Home() {    const services = [
     { number: '50,000+', label: 'Khách hàng tin tưởng' },
     { number: '24/7', label: 'Hỗ trợ khách hàng' },
   ];
-  const testimonials = [
-    {
-      name: 'Chị Nguyễn Thị Lan',
-      role: 'Khách hàng',
-      content: 'Dịch vụ rất chuyên nghiệp, kết quả chính xác và nhanh chóng. Nhân viên tư vấn nhiệt tình, hỗ trợ tận tình.',
-      rating: 5,
-      imageUrl: '/images/customer-1.jpg',
-    },
-    {
-      name: 'Anh Charles Leclerc',
-      role: 'Khách hàng',
-      content: 'i am very dissapointed with this service because they do not speak english so i cannot understand anything.',
-      rating: 1,
-      imageUrl: '/images/customer-2.jpg',
-    },    {
-      name: 'Sir Lewis Hamilton',
-      role: 'Customer',
-      content: 'Excellent privacy protection and outstanding service. I will definitely recommend this to my friends when needed.',
-      rating: 5,
-      imageUrl: '/images/customer-3.jpg',
-    },
-  ];
+  const [feedbacks, setFeedbacks] = useState<TestimonialType[]>([]);
+
+  useEffect(() => {
+    async function fetchFeedbacks() {
+      const feedbackData = await getAllFeedbacks();
+      const users = await getAllUsers();
+
+      // Lọc feedback của 3 người khác nhau (theo customerId)
+      const uniqueCustomerIds = new Set<string>();
+      const uniqueFeedbacks: any[] = [];
+      for (const fb of feedbackData || []) {
+        if (!uniqueCustomerIds.has(fb.customerId) && uniqueFeedbacks.length < 3) {
+          uniqueCustomerIds.add(fb.customerId);
+          uniqueFeedbacks.push(fb);
+        }
+        if (uniqueFeedbacks.length === 3) break;
+      }
+
+      // Map sang TestimonialType
+      const mapped = uniqueFeedbacks.map((fb: any) => {
+        const user = users.find((u: any) => u.userID === fb.customerId);
+        return {
+          name: user?.fullname || user?.username || 'Ẩn danh',
+          role:  'Khách hàng', // Thêm trường role
+          rating: fb.rating || 5,
+          content: fb.comment || '',
+          imageUrl: user?.image || '/images/lab-equipment.svg',
+        };
+      });
+
+      setFeedbacks(mapped);
+    }
+    fetchFeedbacks();
+  }, []);
 
   return (
     <MainLayout>
@@ -114,7 +131,7 @@ export default function Home() {    const services = [
               </div>
               
               {/* Stats */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 justify-center">
                 {stats.map((stat, index) => (
                   <div key={index} className="text-center">
                     <div className="text-2xl lg:text-3xl font-bold text-white">{stat.number}</div>
@@ -153,20 +170,21 @@ export default function Home() {    const services = [
               đáp ứng mọi nhu cầu của khách hàng.
             </p>
           </div>
-          
-          <div className="grid lg:grid-cols-3 gap-8">
+          {/* Căn giữa tất cả dịch vụ */}
+          <div className="flex flex-wrap justify-center gap-8">
             {services.map((service, index) => (
               <div 
                 key={service.id} 
-                className="card-elevated p-8 group hover:scale-105 transition-all duration-300 animate-slide-up"
+                className="card-elevated p-8 group hover:scale-105 transition-all duration-300 animate-slide-up max-w-md w-full"
                 style={{animationDelay: `${index * 100}ms`}}
-              >                <div className="relative w-full h-48 rounded-xl mb-6 overflow-hidden group-hover:scale-105 transition-transform duration-300">
+              >
+                <div className="relative w-full h-48 rounded-xl mb-6 overflow-hidden group-hover:scale-105 transition-transform duration-300">
                   <Image 
                     src={service.imageUrl} 
                     alt={service.title}
-                    width={400}
-                    height={192}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover w-full h-full"
+                    style={{ objectFit: 'cover' }}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.src = '/images/lab-equipment.svg';
@@ -176,7 +194,8 @@ export default function Home() {    const services = [
                 </div>
                 
                 <h3 className="text-xl font-bold text-secondary-900 mb-3">{service.title}</h3>
-                <p className="text-secondary-600 mb-6 leading-relaxed">{service.description}</p>                <div className="space-y-2 mb-6">
+                <p className="text-secondary-600 mb-6 leading-relaxed">{service.description}</p>
+                <div className="space-y-2 mb-6">
                   {service.features.map((feature, featureIndex) => (
                     <div key={featureIndex} className="flex items-center text-sm text-secondary-700">
                       <CheckCircleIcon className="w-4 h-4 text-success-600 mr-2 flex-shrink-0" />
@@ -253,38 +272,48 @@ export default function Home() {    const services = [
               Hàng nghìn khách hàng đã tin tưởng và hài lòng với dịch vụ của chúng tôi.
             </p>
           </div>
-            <div className="grid lg:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div 
-                key={index} 
+          <div className="grid lg:grid-cols-3 gap-8">
+            {feedbacks.map((testimonial, index) => (
+              <div
+                key={index}
                 className="bg-secondary-50 rounded-2xl p-8 animate-slide-up"
-                style={{animationDelay: `${index * 100}ms`}}
-              >                <div className="flex items-center mb-6">
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <div className="flex items-center mb-6">
+                  {/* Hiển thị ảnh và tên người feedback */}
                   <div className="relative w-16 h-16 rounded-full overflow-hidden mr-4 flex-shrink-0">
-                    <Image 
-                      src={testimonial.imageUrl} 
-                      alt={testimonial.name}
-                      width={64}
-                      height={64}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/images/lab-equipment.svg';
-                      }}
-                    />
+                    {testimonial.imageUrl ? (
+                      <img
+                        src={`http://localhost:5198/${testimonial.imageUrl.replace(/^\/+/, '')}`}
+                        alt={testimonial.name}
+                        width={96}
+                        height={96}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = '/images/lab-equipment.svg';
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src="/images/lab-equipment.svg"
+                        alt="default"
+                        width={96}
+                        height={96}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
                   </div>
                   <div>
                     <div className="font-semibold text-secondary-900">{testimonial.name}</div>
                     <div className="text-sm text-secondary-600">{testimonial.role}</div>
                   </div>
                 </div>
-                
                 <div className="flex items-center mb-4">
                   {[...Array(testimonial.rating)].map((_, i) => (
                     <StarIcon key={i} className="w-5 h-5 text-warning-400 fill-current" />
                   ))}
                 </div>
-                
                 <p className="text-secondary-700 italic leading-relaxed">&ldquo;{testimonial.content}&rdquo;</p>
               </div>
             ))}
